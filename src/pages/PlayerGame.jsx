@@ -254,14 +254,16 @@ export default function PlayerGame() {
         : String(question.correctAnswer).split('|')[0];
     body = (
       <div className="card center-text">
-        <h2>The answer: {correctText}</h2>
+        <h2>{correctText ? `The answer: ${correctText}` : 'Time for the answer!'}</h2>
         {myAnswer ? (
           <p className={final?.correct ? 'result-good' : 'result-bad'}>
             {final?.correct ? '✓ Correct!' : '✗ Not this time'}
             {final && <strong> {final.score >= 0 ? '+' : ''}{final.score} pts</strong>}
           </p>
         ) : (
-          <p className="muted">{roundUsesBuzzer(round) ? '' : 'No answer submitted'}</p>
+          <p className="muted">
+            {roundUsesBuzzer(round) || question.type === 'verbal' ? '' : 'No answer submitted'}
+          </p>
         )}
         <p>Your score: <strong>{me?.score || 0}</strong></p>
       </div>

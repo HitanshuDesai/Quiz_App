@@ -155,7 +155,7 @@ function correctAnswerDisplay(question) {
   return String(question.correctAnswer);
 }
 
-function AnswersTable({ code, session, round, question, ri, qi }) {
+function AnswersTable({ code, session, round, question, ri, qi, hideAnswers }) {
   const answers = session.answers?.[ri]?.[qi] || {};
   const players = session.players || {};
   const revealed = session.state.phase === 'revealed';
@@ -183,13 +183,16 @@ function AnswersTable({ code, session, round, question, ri, qi }) {
             const fullPoints = roundUsesWager(round)
               ? Math.max(0, Number(a.wager) || 0)
               : Number(question.points) || 0;
+            const wrongScore = roundUsesWager(round)
+              ? -fullPoints
+              : -Math.max(0, Number(question.negativePoints) || 0);
             return (
               <tr key={pid}>
                 <td>{players[pid]?.name || '?'}</td>
                 <td className="answer-value">{answerDisplay(question, a.value)}</td>
                 {roundUsesWager(round) && <td className="num">{a.wager ?? '—'}</td>}
                 <td className="num">{a.timeMs != null ? `${(a.timeMs / 1000).toFixed(1)}s` : '—'}</td>
-                <td>{auto === true ? '✓' : auto === false ? '✗' : '—'}</td>
+                <td>{hideAnswers ? '🤫' : auto === true ? '✓' : auto === false ? '✗' : '—'}</td>
                 <td className="num">{finalScore != null ? finalScore : revealed ? 0 : '…'}</td>
                 <td className="row gap">
                   <button
@@ -202,7 +205,7 @@ function AnswersTable({ code, session, round, question, ri, qi }) {
                   <button
                     className="btn ghost small"
                     title="Mark wrong"
-                    onClick={() => overrideAnswerScore(code, ri, qi, pid, roundUsesWager(round) ? -fullPoints : 0, false)}
+                    onClick={() => overrideAnswerScore(code, ri, qi, pid, wrongScore, false)}
                   >
                     ✗
                   </button>
@@ -285,6 +288,63 @@ function BuzzerPanel({ code, session, ri, qi }) {
   );
 }
 
+// Live tracker for verbal questions: the host listens to spoken answers and
+// marks each player right (+points) or wrong (−negative points) with one tap.
+function JudgePanel({ code, session, question, ri, qi }) {
+  const points = Number(question.points) || 0;
+  const penalty = Math.max(0, Number(question.negativePoints) || 0);
+  const directedTo = session.state.directedTo;
+  const players = Object.entries(session.players || {}).sort((a, b) =>
+    (a[1].name || '').localeCompare(b[1].name || ''),
+  );
+  const [marked, setMarked] = useState({}); // local note of who you've judged
+
+  function isTarget(pid, p) {
+    if (!directedTo) return false;
+    return directedTo.kind === 'player' ? directedTo.id === pid : directedTo.id === p.teamId;
+  }
+
+  return (
+    <div className="card">
+      <h3>🎤 Verbal answer tracker</h3>
+      <p className="muted small-text">
+        Mark who got it right: ✓ awards {points} pts{penalty > 0 ? `, ✗ deducts ${penalty} pts` : ''}.
+      </p>
+      <ul className="player-list">
+        {players.map(([pid, p]) => (
+          <li key={pid} className={`row gap spread ${isTarget(pid, p) ? 'judge-target' : ''}`}>
+            <span>
+              {isTarget(pid, p) && '🎯 '}
+              {p.name} <strong className="num">{p.score || 0}</strong>
+              {marked[pid] && <span className={marked[pid] === '✓' ? 'result-good' : 'result-bad'}> {marked[pid]}</span>}
+            </span>
+            <span className="row gap">
+              <button
+                className="btn primary small"
+                onClick={() => {
+                  adjustScore(code, pid, points, `verbal correct R${ri + 1}Q${qi + 1}`);
+                  setMarked({ ...marked, [pid]: '✓' });
+                }}
+              >
+                ✓ +{points}
+              </button>
+              <button
+                className="btn danger ghost small"
+                onClick={() => {
+                  if (penalty > 0) adjustScore(code, pid, -penalty, `verbal wrong R${ri + 1}Q${qi + 1}`);
+                  setMarked({ ...marked, [pid]: '✗' });
+                }}
+              >
+                ✗ {penalty > 0 ? `−${penalty}` : 'wrong'}
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ScoreAdjuster({ code, session }) {
   const players = Object.entries(session.players || {});
   const [amounts, setAmounts] = useState({});
@@ -334,12 +394,21 @@ function ActiveGame({ code, session }) {
   const remaining = useCountdown(state.startedAt, state.timeLimit, offset, state.phase === 'open');
   const [picking, setPicking] = useState(null); // 'direct' | 'pass'
   const autoActedRef = useRef(null);
+  // Presenter mode: the host is screen-sharing this page with the audience, so
+  // hide the correct answer until "Show answer to audience" is pressed.
+  const [presenter, setPresenter] = useState(() => localStorage.getItem('quiznight_presenter') === '1');
+  function togglePresenter() {
+    const next = !presenter;
+    setPresenter(next);
+    localStorage.setItem('quiznight_presenter', next ? '1' : '0');
+  }
 
   const phase = state.phase;
   const isLastQuestion = qi >= (round?.questions?.length || 0) - 1;
   const isLastRound = ri >= quiz.rounds.length - 1;
   const directed = roundIsDirected(round);
   const answers = session.answers?.[ri]?.[qi] || {};
+  const hideAnswers = presenter && phase !== 'revealed';
 
   // Host client is the game authority: close the question when time expires,
   // and auto-resolve open-challenge questions on the first correct answer.
@@ -411,6 +480,13 @@ function ActiveGame({ code, session }) {
           {state.paused && <span className="tag live">⏸ PAUSED</span>}
         </div>
         <div className="row gap">
+          <button
+            className={`btn small ${presenter ? 'primary' : 'ghost'}`}
+            title="Hides correct answers until you reveal them — turn on when screen-sharing"
+            onClick={togglePresenter}
+          >
+            🖥 Presenter {presenter ? 'ON' : 'off'}
+          </button>
           <button className="btn ghost small" onClick={() => setPaused(code, !state.paused)}>
             {state.paused ? '▶ Resume' : '⏸ Pause'}
           </button>
@@ -429,14 +505,34 @@ function ActiveGame({ code, session }) {
         {question.type === 'multiple_choice' && (
           <ol className="host-options" type="A">
             {(question.options || []).map((o, i) => (
-              <li key={i} className={Number(question.correctAnswer) === i ? 'correct' : ''}>{o}</li>
+              <li key={i} className={!hideAnswers && Number(question.correctAnswer) === i ? 'correct' : ''}>{o}</li>
             ))}
           </ol>
         )}
-        <p>
-          <strong>Answer:</strong> {correctAnswerDisplay(question)} · <strong>{question.points} pts</strong>
-          {question.timeLimit > 0 && <> · ⏱ {question.timeLimit}s</>}
-        </p>
+        {phase === 'revealed' && presenter && (
+          <div className="reveal-banner">
+            ✓ {correctAnswerDisplay(question) || 'Answered live!'}
+          </div>
+        )}
+        {hideAnswers ? (
+          <p>
+            <strong>{question.points} pts</strong>
+            {Number(question.negativePoints) > 0 && <> · −{question.negativePoints} if wrong</>}
+            {question.timeLimit > 0 && <> · ⏱ {question.timeLimit}s</>}
+            {' · '}
+            <details className="peek">
+              <summary>🤫 Peek answer (the audience will see it too!)</summary>
+              <span>{correctAnswerDisplay(question)}</span>
+            </details>
+          </p>
+        ) : (
+          <p>
+            <strong>Answer:</strong> {correctAnswerDisplay(question) || '(host judges live)'} ·{' '}
+            <strong>{question.points} pts</strong>
+            {Number(question.negativePoints) > 0 && <> · −{question.negativePoints} if wrong</>}
+            {question.timeLimit > 0 && <> · ⏱ {question.timeLimit}s</>}
+          </p>
+        )}
         {state.directedTo && (
           <p className="tag live">→ Directed to: {state.directedTo.name}
             {round.type === 'passing' && ` (passes used: ${state.passesUsed || 0}/${round.settings?.maxPasses ?? '∞'})`}
@@ -470,8 +566,16 @@ function ActiveGame({ code, session }) {
         )}
         {phase === 'open' && (
           <>
-            <button className="btn primary" onClick={() => closeQuestion(code)}>🔒 Close answers</button>
-            <button className="btn ghost" onClick={() => revealAnswer(code, session)}>Reveal now</button>
+            {question.type === 'verbal' ? (
+              <button className="btn primary big" onClick={() => revealAnswer(code, session)}>
+                👁 Show answer to audience
+              </button>
+            ) : (
+              <>
+                <button className="btn primary" onClick={() => closeQuestion(code)}>🔒 Close answers</button>
+                <button className="btn ghost" onClick={() => revealAnswer(code, session)}>👁 Show answer now</button>
+              </>
+            )}
             {round.type === 'passing' && (
               <button className="btn ghost" onClick={() => setPicking('pass')}
                 disabled={(state.passesUsed || 0) >= (round.settings?.maxPasses ?? Infinity)}>
@@ -482,7 +586,7 @@ function ActiveGame({ code, session }) {
         )}
         {phase === 'locked' && (
           <button className="btn primary big" onClick={() => revealAnswer(code, session)}>
-            👁 Reveal answer & apply scores
+            👁 Show answer to audience
           </button>
         )}
         {phase === 'revealed' && (
@@ -507,8 +611,15 @@ function ActiveGame({ code, session }) {
         </div>
       )}
 
-      {phase !== 'idle' && phase !== 'wager' && (
-        <AnswersTable code={code} session={session} round={round} question={question} ri={ri} qi={qi} />
+      {question.type === 'verbal' && phase !== 'idle' && phase !== 'wager' && (
+        <JudgePanel key={`judge-${ri}-${qi}`} code={code} session={session} question={question} ri={ri} qi={qi} />
+      )}
+
+      {question.type !== 'verbal' && phase !== 'idle' && phase !== 'wager' && (
+        <AnswersTable
+          code={code} session={session} round={round} question={question}
+          ri={ri} qi={qi} hideAnswers={hideAnswers}
+        />
       )}
 
       <ScoreAdjuster code={code} session={session} />

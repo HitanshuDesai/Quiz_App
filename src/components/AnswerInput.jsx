@@ -5,6 +5,15 @@ import React, { useState } from 'react';
 export default function AnswerInput({ question, onSubmit, disabled }) {
   const [text, setText] = useState('');
 
+  if (question.type === 'verbal') {
+    return (
+      <div className="card center-text">
+        <h3>🎤 Answer out loud!</h3>
+        <p className="muted">The host is listening and will mark your answer.</p>
+      </div>
+    );
+  }
+
   if (question.type === 'multiple_choice') {
     return (
       <div className="answer-grid">

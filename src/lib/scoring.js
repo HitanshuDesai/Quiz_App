@@ -31,6 +31,8 @@ export function autoCorrect(question, value) {
     case 'closest_number':
       // Exact-match only here; closest_wins rounds are resolved across all answers.
       return Number(value) === Number(question.correctAnswer);
+    case 'verbal':
+      return null; // answered out loud — the host judges it live
     default:
       return null;
   }
@@ -42,6 +44,7 @@ export function scoreQuestion(round, question, answers) {
   const result = {};
   const entries = Object.entries(answers || {});
   const points = Number(question.points) || 0;
+  const penalty = Math.max(0, Number(question.negativePoints) || 0);
 
   if (round.type === 'closest_wins' && question.type === 'closest_number') {
     const target = Number(question.correctAnswer);
@@ -79,8 +82,8 @@ export function scoreQuestion(round, question, answers) {
       .sort((x, y) => (x[1].submittedAt || 0) - (y[1].submittedAt || 0));
     const winner = correctOnes[0]?.[0];
     for (const [pid, a] of entries) {
-      const correct = autoCorrect(question, a.value) === true;
-      result[pid] = { correct, score: pid === winner ? points : 0 };
+      const ac = a.value === undefined ? null : autoCorrect(question, a.value);
+      result[pid] = { correct: ac === true, score: pid === winner ? points : ac === false ? -penalty : 0 };
     }
     return result;
   }
@@ -94,8 +97,8 @@ export function scoreQuestion(round, question, answers) {
   const firstCorrect = correctByTime[0]?.[0];
 
   for (const [pid, a] of entries) {
-    const correct = autoCorrect(question, a.value);
-    let score = correct === true ? points : 0;
+    const correct = a.value === undefined ? null : autoCorrect(question, a.value);
+    let score = correct === true ? points : correct === false ? -penalty : 0;
     if (correct === true && round.type === 'fastest_finger') {
       const speedMax = Number(settings.speedBonusMax) || 0;
       if (speedMax > 0 && limitMs > 0 && a.timeMs != null) {

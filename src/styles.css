@@ -278,6 +278,27 @@ tr.highlight { background: rgba(108, 92, 231, 0.18); }
 .result-good { color: var(--good); font-size: 1.2rem; font-weight: 700; }
 .result-bad { color: var(--bad); font-size: 1.2rem; font-weight: 700; }
 
+/* Presenter mode (host screen-sharing) ------------------------------------ */
+
+.reveal-banner {
+  background: var(--good);
+  color: #06250f;
+  font-size: 1.6rem;
+  font-weight: 800;
+  text-align: center;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 10px 0;
+}
+.peek { display: inline-block; }
+.peek summary { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; }
+.peek span { font-weight: 700; color: var(--primary); }
+.judge-target {
+  background: rgba(108, 92, 231, 0.15);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
 /* Overlay / dialogs ------------------------------------------------------- */
 
 .overlay {
