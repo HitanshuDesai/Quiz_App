@@ -27,6 +27,12 @@ export const QUESTION_TYPES = {
     answerHint: 'Accepted answers separated by | (e.g. "USA|United States")',
     autoScored: true,
   },
+  verbal: {
+    label: 'Verbal (host judges)',
+    hasOptions: false,
+    answerHint: 'Players answer out loud — you mark right/wrong on the tracker',
+    autoScored: false,
+  },
   closest_number: {
     label: 'Closest Number',
     hasOptions: false,
@@ -122,6 +128,7 @@ export function blankQuestion(roundType = 'standard') {
     options: type === 'multiple_choice' ? ['', '', '', ''] : [],
     correctAnswer: type === 'multiple_choice' ? 0 : '',
     points: 10,
+    negativePoints: 0,
     timeLimit: 30,
     mediaUrl: '',
     mediaType: 'image',
@@ -158,7 +165,7 @@ export function normalizeQuiz(quiz) {
   const rounds = (quiz.rounds || []).map((r) => ({
     settings: {},
     ...r,
-    questions: (r.questions || []).map((q) => ({ options: [], ...q })),
+    questions: (r.questions || []).map((q) => ({ options: [], negativePoints: 0, ...q })),
   }));
   return { ...quiz, rounds };
 }

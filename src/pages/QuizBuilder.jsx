@@ -44,7 +44,7 @@ function QuestionEditor({ question, onChange, onDelete, index }) {
         <textarea value={question.text} rows={2} onChange={(e) => set({ text: e.target.value })} />
       </Field>
 
-      <div className="grid-3">
+      <div className="grid-2">
         <Field label="Type">
           <select value={question.type} onChange={(e) => setType(e.target.value)}>
             {Object.entries(QUESTION_TYPES).map(([k, v]) => (
@@ -52,11 +52,16 @@ function QuestionEditor({ question, onChange, onDelete, index }) {
             ))}
           </select>
         </Field>
-        <Field label="Points">
-          <input type="number" min={0} value={question.points} onChange={(e) => set({ points: Number(e.target.value) })} />
-        </Field>
         <Field label="Time limit (sec, 0 = none)">
           <input type="number" min={0} value={question.timeLimit} onChange={(e) => set({ timeLimit: Number(e.target.value) })} />
+        </Field>
+      </div>
+      <div className="grid-2">
+        <Field label="Points (if correct)">
+          <input type="number" min={0} value={question.points} onChange={(e) => set({ points: Number(e.target.value) })} />
+        </Field>
+        <Field label="Negative points (deducted if wrong, 0 = none)">
+          <input type="number" min={0} value={question.negativePoints ?? 0} onChange={(e) => set({ negativePoints: Number(e.target.value) })} />
         </Field>
       </div>
 
@@ -118,6 +123,12 @@ function QuestionEditor({ question, onChange, onDelete, index }) {
 
       {(question.type === 'free_text' || question.type === 'image') && (
         <Field label={`Correct answer — ${typeInfo.answerHint}`}>
+          <input value={question.correctAnswer} onChange={(e) => set({ correctAnswer: e.target.value })} />
+        </Field>
+      )}
+
+      {question.type === 'verbal' && (
+        <Field label="Answer to show at reveal (optional — players answer out loud, you judge on the tracker)">
           <input value={question.correctAnswer} onChange={(e) => set({ correctAnswer: e.target.value })} />
         </Field>
       )}

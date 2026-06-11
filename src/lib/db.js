@@ -311,7 +311,8 @@ export async function judgeBuzz(code, session, playerId, correct) {
     await update(ref(db, `sessions/${code}/state`), { phase: 'revealed', buzzerOpen: false });
     return;
   }
-  const penalty = Number(settings.wrongPenalty) || 0;
+  // Per-question negative points take priority; round-level penalty is the fallback.
+  const penalty = Math.max(0, Number(question.negativePoints) || 0) || Math.max(0, Number(settings.wrongPenalty) || 0);
   if (penalty > 0) {
     await adjustScore(code, playerId, -penalty, `wrong buzz R${ri + 1}Q${qi + 1}`);
   }
