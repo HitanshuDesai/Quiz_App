@@ -1,0 +1,19 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "quizzes": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sessions": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "quiz": {
+          ".validate": "newData.hasChildren(['title', 'rounds'])"
+        }
+      }
+    }
+  }
+}
